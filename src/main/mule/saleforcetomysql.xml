@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="cd3e3066-b4ce-42cc-b032-693343352142" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="e21e7beb-3b79-42ba-a1b9-155259427810" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="root" database="amir" />
+	</db:config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="a70056c7-960e-4f06-9843-2632e57986d1" >
+		<salesforce:basic-connection username="amir2mohammed12@gmail.com" password="amir879250" securityToken="tfo5T2dG3S6FY22vYpCdhUE3" />
+	</salesforce:sfdc-config>
+	<flow name="saleforcetomysqlFlow" doc:id="0f88c4bc-3aba-4135-877e-a716c8b0ed98" >
+		<salesforce:query doc:name="Query" doc:id="eba11eea-0732-4d75-9bbe-9f0d4ca4b2a4" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[SELECT Address__c,Email__c,Gender__c,Id,Id__c,Name__c,Order_Number__c,Payment_Mode__c,Phone_Number__c,Product__c,Quaantity__c FROM Hcustomer__c]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="8191cbc8-65fd-4bde-854c-67b9ee5e1842" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map (payload,index)->
+{
+	"Name":if(payload.Name__c !=null) payload.Name__c else "amir" as String,
+	"Info_id": payload.Id__c,
+	"id":payload.Id,
+	"Email":if(payload.Email__c !=null) payload.Email__c else "amir2mohammed12@ gmail.com" as String,
+	"Address": payload.Address__c,
+	"Phone" :if(payload.Phone_Number__c !=null) payload.Phone_Number__c else "251913122306" as Number,
+	"Gender" : if(payload.Gender__c=="male")"Gents" else "Ladies",
+	"Order_Number": payload.Order_Number__c,
+	"Payment_mode": if(payload.Payment_Mode__c !=null) payload.Payment_Mode__c else "Cash" as String,
+	"Product":payload.Product__c,
+	"Quantity":if(payload.Quaantity__c !=null) payload.Quaantity__c else "0" as Number,
+	
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="47d6a4b2-2a6a-4185-a5a2-ef5094881829">
+			<db:insert doc:name="Insert" doc:id="b57f4035-c701-43d5-be29-e49866d7426d" config-ref="Database_Config">
+				<db:sql><![CDATA[insert into hcustomers(id,Info_id,Name,Email,Address,Gender,Phone,Product,Order_No,Payment_Mode,Quantity)Values(:id,:Info_id,:Name,:Email,:Address,:Gender,:Phone,:Product,:Order_Number,:Payment_mode,:Quantity)]]></db:sql>
+				<db:input-parameters><![CDATA[#[output application/json ---payload]]]></db:input-parameters>
+			</db:insert>
+			<logger level="INFO" doc:name="Logger" doc:id="cca46fad-f765-4aa5-9e65-07811482ed63" message="#[payload]" />
+		</foreach>
+		<set-payload value="#[%dw 2.0
+output application/json
+---
+payload]" doc:name="Set Payload" doc:id="b2d6878a-9e2b-48af-9659-a617ee2157a3" />
+	</flow>
+	<flow name="saleforcetomysqlFlow1" doc:id="8257e18e-ff3c-4ced-91eb-254d5e305bbb" >
+		<salesforce:create type="Hcustomer__c" doc:name="Create" doc:id="d4daea57-3b87-4a4b-94cd-f820e5063207" config-ref="Salesforce_Config"/>
+		<set-payload value='#["data is successfully created....."]' doc:name="Set Payload" doc:id="33d420ae-31b6-441d-a8c7-9b6947d2db5b" />
+	</flow>
+	<flow name="saleforcetomysqlFlow2" doc:id="52dff42b-44af-45c7-b5cd-4891fffd2425" >
+		<http:listener doc:name="Listener" doc:id="71ace34d-15ea-494a-8677-b50b02aa2159" config-ref="HTTP_Listener_config" path="path" allowedMethods="GET,POST"/>
+		<choice doc:name="Choice" doc:id="374f243d-c495-4417-b580-acb861a805df" >
+			<when expression="#[attributes.method=='GET']" doc:id="70347de7-64e5-408d-80d8-223d619cfc06">
+				<flow-ref doc:name="Flow Reference" doc:id="ab0b1a1d-4771-40a6-a46d-6a7b6f0114ff" name="saleforcetomysqlFlow"/>
+			</when>
+			<when expression="#[attributes.method=='POST']">
+				<flow-ref doc:name="Flow Reference" doc:id="19feb249-e45a-49ff-9ffd-5dab50bc6675" name="saleforcetomysqlFlow1"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="b7909edf-093b-4f10-9a4e-2de47924a397" message="#[payload]"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
